@@ -1,0 +1,208 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: An AWS Serverless Specification template describing your function.
+Parameters:
+  LambdaFunctionName:
+    Type: String
+  AuthLambdaRole:
+    Type: String
+  ApmsId:
+    Type: String
+  ApplicationOwner:
+    Type: String
+  ItTechnicalOwner:
+    Type: String
+  ApplicationName:
+    Type: String
+  EnvironmentId:
+    Type: String
+  BusinessUnitN1:
+    Type: String
+  BusinessUnitN2:
+    Type: String
+  ServiceCIID:
+    Type: String
+  APIGWName:
+    Type: String
+  DISXNLB:
+    Type: String
+  APIGWVPCLinkName:
+    Type: String
+  AuthAPIURL:
+    Type: String
+  APIGWVPCEndpointID:
+    Type: String
+  PrivateAPIGWName:
+    Type: String
+  APIGWAuthorizerRole:
+    Type: String
+  AuthLambdaARN:
+    Type: String
+Resources:
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name:
+        Ref: APIGWName
+      Description: DIS-X Authorization API
+      StageName:
+        Ref: EnvironmentId
+      Variables:
+        VPCNLB:
+          Ref: AuthAPIURL
+        VPCLINK:
+          Ref: APIGWVPCLink
+      EndpointConfiguration:
+        Type: REGIONAL
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: s3://disx-infra-serverless-dev/cafae42c5223167702582b1328a6d59f
+      Tags:
+        business-unit-n1:
+          Ref: BusinessUnitN1
+        business-unit-n2:
+          Ref: BusinessUnitN2
+        it-technical-owner:
+          Ref: ItTechnicalOwner
+        application-owner:
+          Ref: ApplicationOwner
+        service-ci-id:
+          Ref: ServiceCIID
+        application-name:
+          Ref: ApplicationName
+        environment-id:
+          Ref: EnvironmentId
+        apms-id:
+          Ref: ApmsId
+        asec-tier: at
+        version: '2022-03-30'
+        ComlianceSOX: 'FALSE'
+        ComplianceGxP: 'TRUE'
+        ComplianceGDPR: 'FALSE'
+        CompliancePII: 'TRUE'
+        ComplianceHIPAA: 'FALSE'
+    Metadata:
+      SamResourceId: ApiGateway
+  APIGWVPCLink:
+    Type: AWS::ApiGateway::VpcLink
+    Properties:
+      Description: VPC Link for DISX API GW
+      Name:
+        Ref: APIGWVPCLinkName
+      TargetArns:
+      - Ref: DISXNLB
+    Metadata:
+      SamResourceId: APIGWVPCLink
+  ApiGateway2:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name:
+        Ref: PrivateAPIGWName
+      Description: DIS-X API GW for microservices
+      Auth:
+        Authorizers:
+          MyLambdaTokenAuth:
+            FunctionPayloadType: TOKEN
+            FunctionInvokeRole:
+              Ref: APIGWAuthorizerRole
+            FunctionArn:
+              Ref: AuthLambdaARN
+            Identity:
+              Header: Authorization
+              ValidationExpression: ^Bearer [-0-9a-zA-z\.]*$
+              ReauthorizeEvery: 300
+        ResourcePolicy:
+          CustomStatements:
+          - Effect: Deny
+            Principal: '*'
+            Action: execute-api:Invoke
+            Resource: execute-api:/*/*/*
+            Condition:
+              StringNotEquals:
+                aws:sourceVpce:
+                  Ref: APIGWVPCEndpointID
+          - Effect: Allow
+            Principal: '*'
+            Action: execute-api:Invoke
+            Resource: execute-api:/*/*/*
+      StageName:
+        Ref: EnvironmentId
+      EndpointConfiguration:
+        Type: PRIVATE
+        VPCEndpointIds:
+        - Ref: APIGWVPCEndpointID
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: s3://disx-infra-serverless-dev/b08c8d1b2fe851efc00b0deea710c935
+      Tags:
+        business-unit-n1:
+          Ref: BusinessUnitN1
+        business-unit-n2:
+          Ref: BusinessUnitN2
+        it-technical-owner:
+          Ref: ItTechnicalOwner
+        application-owner:
+          Ref: ApplicationOwner
+        service-ci-id:
+          Ref: ServiceCIID
+        application-name:
+          Ref: ApplicationName
+        environment-id:
+          Ref: EnvironmentId
+        apms-id:
+          Ref: ApmsId
+        asec-tier: at
+        version: '2022-03-30'
+        ComlianceSOX: 'FALSE'
+        ComplianceGxP: 'TRUE'
+        ComplianceGDPR: 'FALSE'
+        CompliancePII: 'TRUE'
+        ComplianceHIPAA: 'FALSE'
+    Metadata:
+      SamResourceId: ApiGateway2
+  Lambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Auth lambda
+      FunctionName:
+        Ref: LambdaFunctionName
+      Handler: index.handler
+      Runtime: nodejs14.x
+      CodeUri: s3://disx-infra-serverless-dev/39ab6d5ed28f2ad8e06f80885e9ddba5
+      MemorySize: 128
+      Timeout: 300
+      Role:
+        Ref: AuthLambdaRole
+      Environment:
+        Variables:
+          CREDS: '"{\"values\":[{\"issuer\":\"https://takeda.okta.com/oauth2/ausa13bnjeQyU3hu2357\",\"audience\":\"api:pdtdis\",\"client_id\":\"0oatxl9fw2CAxRawX5d6\"},{\"issuer\":\"https://takedaext.oktapreview.com/oauth2/ausyw9oz51Cc9ofU70h7\",\"audience\":\"api://pdt-portal\",\"client_id\":\"0oayw9lrw0DfawBaw0h7\"}]}"'
+      Tags:
+        business-unit-n1:
+          Ref: BusinessUnitN1
+        business-unit-n2:
+          Ref: BusinessUnitN2
+        it-technical-owner:
+          Ref: ItTechnicalOwner
+        application-owner:
+          Ref: ApplicationOwner
+        service-ci-id:
+          Ref: ServiceCIID
+        application-name:
+          Ref: ApplicationName
+        environment-id:
+          Ref: EnvironmentId
+        apms-id:
+          Ref: ApmsId
+        asec-tier: at
+        version: '2022-03-30'
+        ComlianceSOX: 'FALSE'
+        ComplianceGxP: 'TRUE'
+        ComplianceGDPR: 'FALSE'
+        CompliancePII: 'TRUE'
+        ComplianceHIPAA: 'FALSE'
+    Metadata:
+      SamResourceId: Lambda
