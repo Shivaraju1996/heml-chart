@@ -1,0 +1,82 @@
+name: CD
+on:
+  workflow_dispatch:
+     inputs:
+        lambdaname: 
+          type: choice
+          description: 'Select the Lambda Function'
+          required: true
+          options: 
+          - All
+          - disx-dataSync-DonorReferralEvent
+          - disx-dataSync-DisCloudCenterInfoEvent
+          - disx-dataSync-DonorDeferralEvent
+          - disx-dataSync-DonorCommentEvent
+          - disx-dataSync-DonorQuestionnaireEvent
+          - disx-dataSync-RemoteEdqResponseEvent
+          - disx-dataSync-DonorResponseEvent
+          - disx-dataSync-SendEventStatus
+          - disx-dataSync-LastUpdateEvent
+          - disx-dataSync-DisCloudUserPinEvent
+          - disx-dataSync-DonorDemogEvent
+          - disx-dataSync-DonorMonitorStatusEvent
+          - disx-dataSync-DonorProgressEvent
+          - disx-dataSync-DonorStatusEvent
+          - disx-dataSync-DonorMedicationEvent
+          - disx-dataSync-DonorLockEvent
+          - disx-dataSync-DisCloudUserRoleEvent
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get date
+        id: date
+        run: echo "::set-output name=date::$(echo $(date '+%Y-%m-%d'))"
+      
+      - name: checkout
+        uses: actions/checkout@v2
+         
+      - name: setup node
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Build NPM
+        run: npm install
+        
+      - name: Create package
+        run: |
+          zip -r DisXDataSync-${{steps.date.outputs.date}}.zip .
+
+      - name: Copy package to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TEC_DEV_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TEC_DEV_SECRET_ACCESS_KEY }}
+          AWS_REGION: "us-east-1"
+        run: | 
+          aws s3 cp DisXDataSync-${{steps.date.outputs.date}}.zip s3://${{ secrets.TEC_DEV_S3_BUCKET }}/DIS-X/Lambda/Kafka/ --sse aws:kms --sse-kms-key-id ${{ secrets.TEC_DEV_S3_KMS }}
+         
+      - name: Deploy package to provided lambda
+        if: ${{ github.event.inputs.lambdaname  != 'All' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TEC_DEV_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TEC_DEV_SECRET_ACCESS_KEY }}
+          AWS_REGION: "us-east-1"
+        run: | 
+           VERSION=$(aws lambda update-function-code --function-name ${{ github.event.inputs.lambdaname }} --s3-bucket ${{ secrets.TEC_DEV_S3_BUCKET }} --s3-key DIS-X/Lambda/Kafka/DisXDataSync-${{steps.date.outputs.date}}.zip --publish | jq -r .Version)
+           aws lambda update-alias --function-name ${{ github.event.inputs.lambdaname }} --name Dev --function-version $VERSION
+        
+      - name: Deploy package to all lambdas
+        if: ${{ github.event.inputs.lambdaname  == 'All' }}
+        env:
+          LAMBDAS: ${{ secrets.TEC_DEV_LAMBDALIST }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.TEC_DEV_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TEC_DEV_SECRET_ACCESS_KEY }}
+          AWS_REGION: "us-east-1"
+        run: | 
+          for lambda in $LAMBDAS; 
+            do 
+              VERSION=$(aws lambda update-function-code --function-name $lambda --s3-bucket ${{ secrets.TEC_DEV_S3_BUCKET }} --s3-key DIS-X/Lambda/Kafka/DisXDataSync-${{steps.date.outputs.date}}.zip --publish | jq -r .Version)
+              aws lambda update-alias --function-name $lambda --name Dev --function-version $VERSION 
+            done;
