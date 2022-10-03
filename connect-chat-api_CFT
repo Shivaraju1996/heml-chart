@@ -1,0 +1,611 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: PDT connect chat api backed by a lamdba
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - prod
+    - test
+    - deploy
+  Version:
+    Type: String
+  ApmsID:
+    Type: String
+  ApplicationName:
+    Type: String
+  BusinessUnitN1:
+    Type: String
+  BusinessUnitN2:
+    Type: String
+  ITTechnicalOwner:
+    Type: String
+  ApplicationOwner:
+    Type: String
+  AsecF:
+    Type: String
+  ConnectInstanceId:
+    Type: String
+  ContactFlowId:
+    Type: String
+  queueId:
+    Type: String
+  cncId:
+    Type: String
+  fndId:
+    Type: String
+  fwiId:
+    Type: String
+  owiId:
+    Type: String
+Globals:
+  Api:
+    OpenApiVersion: 3.0.1
+Resources:
+  PDTMssRemoteSupportApi:
+    Type: AWS::Serverless::Api
+    DependsOn: MSSLogGroup
+    Properties:
+      StageName:
+        Ref: Environment
+      Cors: '''*'''
+      GatewayResponses:
+        DEFAULT_4xx:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: '''*'''
+        DEFAULT_5xx:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: '''*'''
+      TracingEnabled: true
+      Name:
+        Fn::Sub: ${AWS::StackName}
+      Tags:
+        version:
+          Ref: Version
+        apms-id:
+          Ref: ApmsID
+        application-name:
+          Ref: ApplicationName
+        business-unit-n1:
+          Ref: BusinessUnitN1
+        business-unit-n2:
+          Ref: BusinessUnitN2
+        environment-id:
+          Ref: Environment
+        it-technical-owner:
+          Ref: ITTechnicalOwner
+        application-owner:
+          Ref: ApplicationOwner
+        asec-f:
+          Ref: AsecF
+      MethodSettings:
+      - LoggingLevel: INFO
+        ResourcePath: /*
+        HttpMethod: '*'
+        DataTraceEnabled: true
+        MetricsEnabled: true
+      AccessLogSetting:
+        DestinationArn:
+          Fn::GetAtt:
+          - MSSLogGroup
+          - Arn
+        Format: '{ "requestId":"$context.requestId", "ip": "$context.identity.sourceIp",
+          "requestTime":"$context.requestTime", "httpMethod":"$context.httpMethod","routeKey":"$context.routeKey",
+          "status":"$context.status","protocol":"$context.protocol", "responseLength":"$context.responseLength",
+          "integrationError:"$context.integrationErrorMessage" }'
+      DefinitionBody:
+        swagger: '2.0'
+        info:
+          version: '2020-09-03T17:22:01Z'
+          title: pdt-mss-remote-support-api
+        schemes:
+        - https
+        paths:
+          /chat:
+            post:
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+              security:
+              - api_key: []
+              - JWTvalidation: []
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                uri:
+                  Fn::Join:
+                  - ''
+                  - - 'arn:aws:apigateway:'
+                    - Ref: AWS::Region
+                    - :lambda:path/2015-03-31/functions/
+                    - Fn::ImportValue: pdtMssChatFunctionArn
+                    - /invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                contentHandling: CONVERT_TO_TEXT
+            options:
+              consumes:
+              - application/json
+              produces:
+              - application/json
+              security:
+              - {}
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '''OPTIONS,POST'''
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                requestTemplates:
+                  application/json: '{"statusCode": 200 }'
+                passthroughBehavior: when_no_match
+          /queue:
+            get:
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+              security:
+              - api_key: []
+              - JWTvalidation: []
+              x-amazon-apigateway-integration:
+                uri:
+                  Fn::Join:
+                  - ''
+                  - - 'arn:aws:apigateway:'
+                    - Ref: AWS::Region
+                    - :lambda:path/2015-03-31/functions/
+                    - Fn::ImportValue: pdtMssQueueCountFunctionArn
+                    - /invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+            options:
+              consumes:
+              - application/json
+              produces:
+              - application/json
+              security:
+              - {}
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                passthroughBehavior: when_no_match
+                type: mock
+          /login:
+            post:
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+              security:
+              - api_key: []
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                uri:
+                  Fn::Join:
+                  - ''
+                  - - 'arn:aws:apigateway:'
+                    - Ref: AWS::Region
+                    - :lambda:path/2015-03-31/functions/
+                    - Fn::ImportValue: pdtMssLoginProxyFunctionArn
+                    - /invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                contentHandling: CONVERT_TO_TEXT
+            options:
+              consumes:
+              - application/json
+              produces:
+              - application/json
+              security:
+              - {}
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '''OPTIONS,POST'''
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                passthroughBehavior: when_no_match
+          /donor-position:
+            get:
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+              security:
+              - api_key: []
+              - JWTvalidation: []
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Join:
+                  - ''
+                  - - 'arn:aws:apigateway:'
+                    - Ref: AWS::Region
+                    - :lambda:path/2015-03-31/functions/
+                    - Fn::ImportValue: FindDonorPositionInQueueFunctionArn
+                    - /invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+            options:
+              consumes:
+              - application/json
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Credentials:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS,POST'''
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                passthroughBehavior: when_no_match
+        securityDefinitions:
+          api_key:
+            type: apiKey
+            name: x-api-key
+            in: header
+          JWTvalidation:
+            type: apiKey
+            name: Authorization
+            in: header
+            x-amazon-apigateway-authtype: custom
+            x-amazon-apigateway-authorizer:
+              type: request
+              identitySource: method.request.header.Authorization
+              authorizerUri:
+                Fn::Sub:
+                - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+                - FunctionArn:
+                    Fn::ImportValue: apiAuthFunctionArn
+              authorizerResultTtlInSeconds: 0
+          roleCheck:
+            type: apiKey
+            name: Authorization
+            in: header
+            x-amazon-apigateway-authtype: custom
+            x-amazon-apigateway-authorizer:
+              type: request
+              identitySource: method.request.header.Authorization
+              authorizerUri:
+                Fn::Sub:
+                - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+                - FunctionArn:
+                    Fn::ImportValue: MSSAuthAndAccessControlFunctionArn
+              authorizerResultTtlInSeconds: 0
+        definitions:
+          Empty:
+            type: object
+            title: Empty Schema
+    Metadata:
+      SamResourceId: PDTMssRemoteSupportApi
+  apiAuthFunctionConnectChatApiPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+    - PDTMssRemoteSupportApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::ImportValue: apiAuthFunctionName
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PDTMssRemoteSupportApi}/${Environment}/*/*
+    Metadata:
+      SamResourceId: apiAuthFunctionConnectChatApiPermission
+  MSSAuthAndAccessConnectChatApiPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+    - PDTMssRemoteSupportApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::ImportValue: MSSAuthAndAccessControlFunctionName
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PDTMssRemoteSupportApi}/${Environment}/*/*
+    Metadata:
+      SamResourceId: MSSAuthAndAccessConnectChatApiPermission
+  ConnectChatInvocationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::ImportValue: pdtMssChatFunctionArn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PDTMssRemoteSupportApi}/*/*/*
+    Metadata:
+      SamResourceId: ConnectChatInvocationPermission
+  FindDonorPositionInQueuePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::ImportValue: FindDonorPositionInQueueFunctionArn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PDTMssRemoteSupportApi}/${Environment}/GET/donor-position
+    Metadata:
+      SamResourceId: FindDonorPositionInQueuePermission
+  QueueCountInvocationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::ImportValue: pdtMssQueueCountFunctionArn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PDTMssRemoteSupportApi}/*/*/*
+    Metadata:
+      SamResourceId: QueueCountInvocationPermission
+  LoginProxyInvocationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::ImportValue: pdtMssLoginProxyFunctionArn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PDTMssRemoteSupportApi}/*/*/*
+    Metadata:
+      SamResourceId: LoginProxyInvocationPermission
+  MSSLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+        - /
+        - - /aws/apigateway
+          - Fn::Sub: ${AWS::StackName}-logGroup
+      RetentionInDays: 14
+      Tags:
+      - Key: version
+        Value:
+          Ref: Version
+      - Key: apms-id
+        Value:
+          Ref: ApmsID
+      - Key: application-name
+        Value:
+          Ref: ApplicationName
+      - Key: business-unit-n1
+        Value:
+          Ref: BusinessUnitN1
+      - Key: business-unit-n2
+        Value:
+          Ref: BusinessUnitN2
+      - Key: environment-id
+        Value:
+          Ref: Environment
+      - Key: it-technical-owner
+        Value:
+          Ref: ITTechnicalOwner
+      - Key: application-owner
+        Value:
+          Ref: ApplicationOwner
+      - Key: asec-f
+        Value:
+          Ref: AsecF
+    Metadata:
+      SamResourceId: MSSLogGroup
+  MssApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn: PDTMssRemoteSupportApiStage
+    Properties:
+      Name: mssapikey
+      Description: Api key for mss connect lambdas
+      Enabled: true
+      StageKeys:
+      - RestApiId:
+          Ref: PDTMssRemoteSupportApi
+        StageName:
+          Ref: Environment
+      Tags:
+      - Key: version
+        Value:
+          Ref: Version
+      - Key: apms-id
+        Value:
+          Ref: ApmsID
+      - Key: application-name
+        Value:
+          Ref: ApplicationName
+      - Key: business-unit-n1
+        Value:
+          Ref: BusinessUnitN1
+      - Key: business-unit-n2
+        Value:
+          Ref: BusinessUnitN2
+      - Key: environment-id
+        Value:
+          Ref: Environment
+      - Key: it-technical-owner
+        Value:
+          Ref: ITTechnicalOwner
+      - Key: application-owner
+        Value:
+          Ref: ApplicationOwner
+      - Key: asec-f
+        Value:
+          Ref: AsecF
+    Metadata:
+      SamResourceId: MssApiKey
+  MSSUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: PDTMssRemoteSupportApiStage
+    Properties:
+      ApiStages:
+      - ApiId:
+          Ref: PDTMssRemoteSupportApi
+        Stage:
+          Ref: Environment
+      Description: Usage plan for MSS Remote support api
+      Throttle:
+        BurstLimit: 1000
+        RateLimit: 1000
+      UsagePlanName: MSSUsagePlan
+      Tags:
+      - Key: version
+        Value:
+          Ref: Version
+      - Key: apms-id
+        Value:
+          Ref: ApmsID
+      - Key: application-name
+        Value:
+          Ref: ApplicationName
+      - Key: business-unit-n1
+        Value:
+          Ref: BusinessUnitN1
+      - Key: business-unit-n2
+        Value:
+          Ref: BusinessUnitN2
+      - Key: environment-id
+        Value:
+          Ref: Environment
+      - Key: it-technical-owner
+        Value:
+          Ref: ITTechnicalOwner
+      - Key: application-owner
+        Value:
+          Ref: ApplicationOwner
+      - Key: asec-f
+        Value:
+          Ref: AsecF
+    Metadata:
+      SamResourceId: MSSUsagePlan
+  MSSUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId:
+        Ref: MssApiKey
+      KeyType: API_KEY
+      UsagePlanId:
+        Ref: MSSUsagePlan
+    Metadata:
+      SamResourceId: MSSUsagePlanKey
+Outputs:
+  PdtMssSupportApiUrl:
+    Description: API Gateway endpoint URL for Prod stage for Connect Lambda function
+    Value:
+      Fn::Sub: https://${PDTMssRemoteSupportApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/chat/
+  PdtMssSupportApi:
+    Description: API Gateway endpoint URL for Prod stage for Connect Lambda function
+    Value:
+      Ref: PDTMssRemoteSupportApi
